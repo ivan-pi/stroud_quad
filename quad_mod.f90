@@ -1,58 +1,60 @@
+!>
+!   Gaussian quadrature routines
+!
+!### Author
+! * Stroud, A. H. -- original author
+! * Pribec, Ivan -- refactoring and modernization
+
 module quad_mod
 
-    use, intrinsic :: iso_fortran_env, only: wp => real64
+    use, intrinsic :: iso_fortran_env, only: wp => real128
     implicit none
     private
 
-    public :: hermite, laguerre, wp, pi
+    public :: wp, pi
+    public :: jacobi, hermite, laguerre
 
     real(wp), parameter :: pi = 4.0_wp*atan(1.0_wp)
-    real(wp), parameter :: eps = epsilon(1.0_wp)
+    real(wp), parameter :: epsm = epsilon(1.0_wp)
     integer, parameter :: max_iter = 10
 
 contains
 
-    !                  CALCULATES THE ZEROS X(I) OF THE NN-TH ORDER
-    !                JACOBI POLYNOMIAL PN(ALF,BTA) FOR THE SEGMENT (-1,1).
-    !                THE LARGEST ZERO WILL BE STORED IN X(l). ALSO
-    !                CALCULATES THE CORRESPONDING COEFFICIENTS  A(I)
-    !                OF THE NN-TH ORDER GAUSS-JACOBI QUADRATURE FORMULA
-    !                OF DEGREE 2*NN-1.
-    !                  THIS SUBROUTINE MUST BE GIVEN THE COEFFICIENTS
-
-    !                                  (ALF+BTA)(BTA-ALF)
-    !                      B(N) =  --------------------------
-    !                              (ALF+BTA+2N)(ALF+BTA+2N-2)
-
-    !                            4(N-1MALF+N-1) ( BTA+N-1) (ALF+BTA+N-1)
-    !                C(N) =  ---------------------------------------------
-    !                        (ALF+BTA+2N-1)(ALF+BTA+2N-2)**2(ALF+BTA+2N-3)
-
-    !                IN THE RECURSION RELATION
-
-    !                      P(N) = (X - B(N))*P(N-1) - C(N)*P(N-2)
-
-    !                FOR ALL N LESS THAN OR EQUAL TO THE HIGHEST DEGREE NN.
-
-    !                    CSX = CALC SUM X(I)    TSX = TRUE SUM X(I)
-    !                    CSA = CALC SUM A(I)    TSA = TRUE SUM A(I)
+!>
+!   Calculates the zeros \(x_i\) of the `nn`-th order Jacobi
+!   polynomial \(P^{(\alfa,\beta)}_n(x)\) for the segment \((-1,1)\)-
+!
+!   The largest zero will be stored in `x(1)`. Also calculates the
+!   corresponding coefficients \(A_i\) of the `nn`-th order Gauss-Jacobi
+!   quadrature formula of degree `2*nn-1`. This subroutine must be given
+!   the coefficients
+!   \[b_n = \frac{(\alfa + \beta)(\beta - \alfa)}{(\alfa+\beta+2n)(\alfa+\beta+2n-2)}\]
+!   \[c_n = \frac{4(n-1)(\alfa+n-1)(\beta+n-1)(\alfa+\beta+n-1)}{(\alfa+\beta+2n-1)(\alfa+\beta+2n-2)^2 (\alfa+\beta+2n-3)}\]
+!   in the recursion relation 
+!   \[P_n = (x - b_n)P_{n-1} - c_n P_{n-1}\]
+!   for all \(n\) less than or equal to the highest degree `nn`.
+!
     subroutine jacobi(nn,x,a,alf,bta,b,c,eps,csx,csa,tsx,tsa)
-        integer, intent(in) :: nn
-        real(wp), intent(out) :: x(50)
-        real(wp), intent(out) :: a(50)
-        real(wp), intent(in) :: alf
-        real(wp), intent(in) :: bta
-        real(wp), intent(in) :: b(50)
-        real(wp), intent(in) :: c(50)
-        real(wp), intent(in) :: eps
-        real(wp), intent(out) :: csx
-        real(wp), intent(out) :: csa
-        real(wp), intent(out) :: tsx
-        real(wp), intent(out) :: tsa
+        integer, intent(in) :: nn           !! Degree of polynomial
+        real(wp), intent(out) :: x(*)       !! Zeros of the polynomial
+        real(wp), intent(out) :: a(*)       !! Quadrature weights
+        real(wp), intent(in) :: alf         !! Exponent $\alfa$ of the Jacobi polynomial
+        real(wp), intent(in) :: bta         !! Exponent $\beta$ of the Jacobi polynomial
+        real(wp), intent(in) :: b(*), c(*)  !! Coefficients of the recurrence relation
+        real(wp), intent(in), optional :: eps         !! Desired accuracy
+        real(wp), intent(out) :: csx        !! Calculated sum of zeros \(x_i\)
+        real(wp), intent(out) :: csa        !! Calculated sum of quadrature weights \(A_i\)
+        real(wp), intent(out) :: tsx        !! True sum of zeros \(x_i\)
+        real(wp), intent(out) :: tsa        !! True sum of quadrature weights \(A_i\)
 
-        integer :: i
+        integer :: i, j
         real(wp) :: fn, beta, cc
-        real(wp) :: an, bn, r1, r2, r3, ratio, xt
+        real(wp) :: an, bn, r1, r2, r3, ratio, xt, dpn, pn1
+        real(wp) :: sigma, theta, dtheta
+        real(wp) :: eps_
+
+        eps_ = epsm
+        if (present(eps)) eps_ = eps
 
         fn = nn
         csx = 0.0_wp
@@ -61,157 +63,90 @@ contains
         cc = 2.0_wp**(alf+bta+1.0_wp)*beta
         tsx = fn*(bta - alf)/(alf + bta + 2.0_wp*fn)
         tsa = cc
-        do  j=2,nn
+        do j=2,nn
           cc = cc*c(j)
         end do
-    do i = 1, nn
-
-        select case(i)
-        case(1)                  ! largest zero
-            an = alf/fn
-            bn = bta/fn
-            r1 = (1. + alf)*(2.78/(4. + fn*fn) + .768*an/fn)
-            r2 = 1. + 1.48*an + .96*bn + .452*an*an + .83*an*bn
-            xt = 1. - r1/r2 
-        case(2)                  ! second zero
-            r1 = (4.1+alf)/((1.+alf)*(1.+.156*alf))
-            r2 = 1. + .06*(fn-8.)*(1.+.12*alf)/fn
-            r3 = 1. + .012*bta*(1.+.25*ABS(alf))/fn
-            ratio = r1*r2*r3
-            xt = xt - ratio*(1.-xt)
-        case(3)
-            r1 = (1.67+.28*alf)/(1.+.37*alf)
-            r2 = 1. + .22*(fn-8.)/fn
-            r3 = 1. + 8.*bta/((6.28+bta)*fn*fn)
-            ratio = r1*r2*r3
-            xt = xt - ratio*(x(1) - xt)
-        case(nn-1) ! second last zero
-            r1 = (1. + .235*bta)/(.766+.119*bta)
-            r2 = 1./( 1. + .639*(fn-4.)/(1.+.71*(fn-4.)) )
-            r3 = 1./( 1. + 20.*alf/((7.5+alf)*fn*fn) )
-            ratio = r1*r2*r3
-            xt = xt + ratio*(xt-x(i-2))
-        case(nn) ! last zero
-            r1 = (1.+.37*bta)/(1.67+.28*bta)
-            r2 = 1./( 1. + .22*(fn-8.)/fn )
-            r3 = 1./( 1. + 8.*alf/((6.28+alf)*fn*fn) )
-            ratio = r1*r2*r3
-            xt = xt + ratio*(xt-x(i-2))
-        case default !middle zeros
-            xt = 3.*x(i-1) - 3.*x(i-2) + x(i-3)
-        end select
-        call root(xt,nn,alf,bta,dpn,pn1,b,c,eps)
-        x(i) = xt
-        a(i) = cc/(dpn*pn1)
-        WRITE(*,20) alf,bta,nn,i,xt,a(i)
-        csx = csx + xt
-        csa = csa + a(i)
-
-      IF( i-1  < 0) THEN
-        GO TO    12
-      ELSE IF ( i-1  == 0) THEN
-        GO TO     2
-      ELSE
-        GO TO     3
-      END IF
-    !                  LARGEST ZERO
-      2 an = alf/fn
-      bn = bta/fn
-      r1 = (1.+alf)*(2.78/(4.+fn*fn) + .768*an/fn)
-      r2 = 1. + 1.48*an + .96*bn + .452*an*an + .83*an*bn
-      xt = 1. - r1/r2
-      GO TO 11
-      3 IF( i-2  < 0) THEN
-        GO TO    12
-      ELSE IF ( i-2  == 0) THEN
-        GO TO     4
-      ELSE
-        GO TO     5
-      END IF
-    !                  SECOND ZERO
-      4 r1 = (4.1+alf)/((1.+alf)*(1.+.156*alf))
-      r2 = 1. + .06*(fn-8.)*(1.+.12*alf)/fn
-      r3 = 1. + .012*bta*(1.+.25*ABS(alf))/fn
-      ratio = r1*r2*r3
-      xt = xt - ratio*(1.-xt)
-      GO TO 11
-      5 IF( i-3  < 0) THEN
-        GO TO    12
-      ELSE IF ( i-3  == 0) THEN
-        GO TO     6
-      ELSE
-        GO TO     7
-      END IF
-    !                  THIRD ZERO
-      6 r1 = (1.67+.28*alf)/(1.+.37*alf)
-      r2 = 1. + .22*(fn-8.)/fn
-      r3 = 1. + 8.*bta/((6.28+bta)*fn*fn)
-      ratio = r1*r2*r3
-      xt = xt - ratio*(x(1) - xt)
-      GO TO 11
-      7 IF(nn-i-1 < 0) THEN
-        GO TO    10
-      ELSE IF (nn-i-1 == 0) THEN
-        GO TO     9
-      END IF
-    !                  MIDDLE ZEROS
-      8 xt = 3.*x(i-1) - 3.*x(i-2) + x(i-3)
-      GO TO 11
-    !                  SECOND LAST ZERO
-      9 r1 = (1. + .235*bta)/(.766+.119*bta)
-      r2 = 1./( 1. + .639*(fn-4.)/(1.+.71*(fn-4.)) )
-      r3 = 1./( 1. + 20.*alf/((7.5+alf)*fn*fn) )
-      ratio = r1*r2*r3
-      xt = xt + ratio*(xt-x(i-2))
-      GO TO 11
-    !                  LAST ZERO
-      10 r1 = (1.+.37*bta)/(1.67+.28*bta)
-      r2 = 1./( 1. + .22*(fn-8.)/fn )
-      r3 = 1./( 1. + 8.*alf/((6.28+alf)*fn*fn) )
-      ratio = r1*r2*r3
-      xt = xt + ratio*(xt-x(i-2))
-      
-      11 CALL root(xt,nn,alf,bta,dpn,pn1,b,c,eps)
-        x(i) = xt
-        a(i) = cc/(dpn*pn1)
-        WRITE(*,20) alf,bta,nn,i,xt,a(i)
-        csx = csx + xt
-        csa = csa + a(i)
-    end do
-
-    write(*,20) alf,bta,nn,i,csx,csa,tsx,tsa
-20  format(2f6.2,2i3,2(1x,e14.8),2x,2(1x,e14.8))
-
+    
+        do i = 1, nn
+            if (i == 1) then ! largest zero
+                an = alf/fn
+                bn = bta/fn
+                r1 = (1.0_wp+alf)*(2.78_wp/(4.0_wp+fn*fn)+0.768_wp*an/fn)
+                r2 = 1.0_wp+1.48_wp*an+0.96_wp*bn+0.452_wp*an*an+0.83_wp*an*bn
+                xt = 1.0_wp - r1/r2
+            else if (i == 2) then ! second zero
+                r1 = (4.1_wp+alf)/((1.0_wp+alf)*(1.0_wp+0.156_wp*alf))
+                r2 = 1.0_wp + 0.06_wp*(fn-8.0_wp)*(1.0_wp+0.12_wp*alf)/fn
+                r3 = 1.0_wp + 0.012_wp*bta*(1.0_wp+0.25_wp*abs(alf))/fn
+                ratio = r1*r2*r3
+                xt = xt - ratio*(1.0_wp-xt)
+            else if (i == 3) then
+                r1 = (1.67_wp+0.28_wp*alf)/(1.0_wp+0.37_wp*alf)
+                r2 = 1.0_wp + 0.22_wp*(fn-8.0_wp)/fn
+                r3 = 1.0_wp + 8.0_wp*bta/((6.28_wp+bta)*fn*fn)
+                ratio = r1*r2*r3
+                xt = xt - ratio*(x(1) - xt)
+            else if (i == nn - 1) then ! second last zero
+                r1 = (1.0_wp + 0.235_wp*bta)/(0.766_wp+0.119_wp*bta)
+                r2 = 1.0_wp/(1.0_wp + 0.639_wp*(fn-4.0_wp)/(1.0_wp+0.71_wp*(fn-4.0_wp)))
+                r3 = 1.0_wp/(1.0_wp + 20.0_wp*alf/((7.5_wp+alf)*fn*fn) )
+                ratio = r1*r2*r3
+                xt = xt + ratio*(xt-x(i-2))
+            else if (i == nn) then ! last zero
+                r1 = (1.0_wp+0.37_wp*bta)/(1.67_wp+0.28_wp*bta)
+                r2 = 1.0_wp/(1.0_wp + 0.22_wp*(fn-8.0_wp)/fn )
+                r3 = 1.0_wp/(1.0_wp + 8.0_wp*alf/((6.28_wp+alf)*fn*fn) )
+                ratio = r1*r2*r3
+                xt = xt + ratio*(xt-x(i-2))
+            else !middle zeros
+                xt = 3.0_wp*x(i-1) - 3.0_wp*x(i-2) + x(i-3)
+            end if
+                sigma = 2*fn + alf + bta + 1.0_wp
+                theta = pi*(2*i + bta - 0.5_wp)/sigma
+                dtheta = ((0.25_wp-bta**2)*cotan(0.5_wp*theta)-(0.25_wp-alf**2)*tan(0.5_wp*theta))/sigma**2
+                xt = cos(theta + dtheta)
+            call root(xt,nn,alf,bta,dpn,pn1,b,c,eps_)
+            x(i) = xt
+            a(i) = cc/(dpn*pn1)
+            WRITE(*,'(2f6.2,2i3,2(1x,e16.10),2x,2(1x,e16.10))') alf,bta,nn,i,xt,a(i)
+            csx = csx + xt
+            csa = csa + a(i)
+        end do
+        write(*,'(2f6.2,2i3,2(1x,e16.10),2x,2(1x,e16.10))') alf,bta,nn,i,csx,csa,tsx,tsa
     end subroutine
 
-    !                  IMPROVES THE APPROXIMATE ROOT X
-    !                IN ADDITION WE ALSO OBTAIN
+!>
+!   Improves the approximate root x of the Jacobi polynomial
+!
+!   In addition we also obtain the derivative of $P(n)$ at $x$
+!   and the value of $P(n-1)$ at x
+!
     subroutine root(x,nn,alf,bta,dpn,pn1,b,c,eps)
-        real(wp), intent(inout) :: x
-        integer, intent(in) :: nn
-        real(wp), intent(in) :: alf
-        real(wp), intent(in) :: bta
-        real(wp), intent(out) :: dpn !! DERIVATIVE OF P(N) AT X
-        real(wp), intent(out) :: pn1 !! VALUE OF P(N-l) AT X
-        real(wp), intent(in) :: b(*)
-        real(wp), intent(in) :: c(*)
-        real(wp), intent(in) :: eps
+        real(wp), intent(inout) :: x        !! Approximate root value
+        integer, intent(in) :: nn           !! Degree of polynomial
+        real(wp), intent(in) :: alf         !! Exponent $\alfa$ of the Jacobi polynomial
+        real(wp), intent(in) :: bta         !! Exponent $\beta$ of the Jacobi polynomial
+        real(wp), intent(out) :: dpn        !! Derivative of P(n) at x
+        real(wp), intent(out) :: pn1        !! Value of P(n-l) at x
+        real(wp), intent(in) :: b(*), c(*)  !! Coefficients of the recurrence relation
+        real(wp), intent(in) :: eps         !! Desired accuracy
 
         integer :: iter
         real(wp) :: d, p, dp
 
-        iter = 0
-        do
-            iter = iter + 1
+        do iter = 1, max_iter
             call recur(p,dp,pn1,x,nn,alf,bta,b,c)
             d = p/dp
             x = x - d
             if (abs(d) < eps) exit
-            if (iter > max_iter) exit
         end do
+        print *, "iter = ", iter
         dpn = dp
     end subroutine
 
+!>
+!   Recurrence relation of the Jacobi polynomial
+!
     subroutine recur(pn,dpn,pn1,x,nn,alf,bta,b,c)
         real(wp), intent(out) :: pn
         real(wp), intent(out) :: dpn
@@ -244,41 +179,42 @@ contains
     end subroutine
 
 
-    !                  CALCULATES THE ZEROS  X(I)  OF THE NN-TH ORDER
-    !                LAGUERRE POLYNOMIAL LN(ALF) FOR THE SEGMENT (0,INF)
-    !                THE SMALLEST ZERO WILL BE STORED IN X(1). ALSO
-    !                CALCULATES THE CORRESPONDING COEFFICIENTS  A(I)
-    !                OF THE NN-TH ORDER LAGUERRE QUADRATURE FORMULA
-    !                OF DEGREE 2*NN-1.
-    !                  THIS SUBROUTINE MUST BE GIVEN THE COEFFICIENTS
-
-    !                           B(N) =  (ALF + 2N - 1)
-
-    !                        C(N) = (N-1)(ALF + N - 1)
-
-    !                IN THE RECURSION RELATION
-
-    !                      P(N) = (X - B(N))*P(N-1) - C(N)*P(N-2)
-
-    !                FOR ALL N LESS THAN OR EQUAL TO THE HIGHEST DEGREE NN.
-
-    !                    CSX = CALC SUM X(I)    TSX = TRUE SUM X(I)
-    !                    CSA = CALC SUM A(I)    TSA = TRUE SUM A(I)
+!>
+!   Calculates the zeros \(x_i\) of the `nn`-th order
+!   Laguerre polynomial \(L^{\alpha}_n(x)\) for the segment \((0,\infty)\).
+!
+!   The smallest zero will be stored in `x(1)`. Also
+!   calculates the corresponding coefficients \(A_i\))
+!   of the `nn`-th order Laguerre quadrature formula
+!   of degree `2*nn-1`:
+!   \[\int^{+\infty}_0 x^\alpha e^{-x} f(x) dx \simeq \sum_{i=1}^nn A_i f(x_i)\]
+!
+!   This subroutine must be given the coefficients
+!   \[b_n = \alpha + 2n - 1\]
+!   \[c_n = (n-1)(\slpha + n - 1\]
+!           C(N) = (N-1)(ALF + N - 1)
+!   in the recursion relation
+!   \[P_n = (x-b_n)P_{n-1} - c_n P_{n-1}\]
+!   for all \(n\) less than or equal to the highest degree `nn`.
+!
     subroutine laguerre(nn,x,a,alf,b,c,eps,csx,csa,tsx,tsa)
-        integer, intent(in) :: nn
-        real(wp), intent(out) :: x(nn)
-        real(wp), intent(out) :: a(nn)
-        real(wp), intent(in) :: alf
-        real(wp), intent(in) :: b(nn)
-        real(wp), intent(in) :: c(nn)
-        real(wp), intent(in) :: eps
-        real(wp), intent(out) :: csx
-        real(wp), intent(out) :: csa
-        real(wp), intent(out) :: tsx
-        real(wp), intent(out) :: tsa
+        integer, intent(in) :: nn           !! Degree of polynomial
+        real(wp), intent(out) :: x(nn)      !! Zeros of the polynomial
+        real(wp), intent(out) :: a(nn)      !! Quadrature weights
+        real(wp), intent(in) :: alf         !! Exponent $\alfa$ of the Laguerre polynomial
+        real(wp), intent(in) :: b(nn),c(nn) !! !! Coefficients of the recurrence relation
+        real(wp), intent(in), optional :: eps         !! Desired accuracy
+        real(wp), intent(out) :: csx        !! Calculated sum of zeros \(x_i\)
+        real(wp), intent(out) :: csa        !! Calculated sum of quadrature weights \(A_i\)
+        real(wp), intent(out) :: tsx        !! True sum of zeros \(x_i\)
+        real(wp), intent(out) :: tsa        !! True sum of quadrature weights \(A_i\)
 
         real(wp) :: fn, cc, xt, fi, r1, r2, ratio, dpn, pn1
         integer :: j, i
+        real(wp) :: eps_
+
+        eps_ = epsm
+        if (present(eps)) eps_ = eps
 
         fn = nn
         csx = 0
@@ -291,19 +227,19 @@ contains
         end do
         do i = 1, nn
             select case(i)
-            case(1)
-                xt = (1.0_wp + alf)*(3.0_wp + 0.92_wp*alf)/(1.0_wp + 2.4_wp*fn + 1.8_wp*alf) ! smallest zero
-            case(2)
-                xt = xt + (15.0_wp + 6.25_wp*alf)/(1.0_wp + 9.0_wp*alf + 2.5_wp*fn)     ! second zero
-            case default
-                fi = i - 2                                      ! all other zeros                   
+            case(1) ! smallest zero
+                xt = (1.0_wp + alf)*(3.0_wp + 0.92_wp*alf)/(1.0_wp + 2.4_wp*fn + 1.8_wp*alf)
+            case(2) ! second zero
+                xt = xt + (15.0_wp + 6.25_wp*alf)/(1.0_wp + 0.9_wp*alf + 2.5_wp*fn)
+            case default ! all other zeros
+                fi = i - 2                                                    
                 r1 = (1.0_wp + 2.55_wp*fi)/(1.9_wp*fi)
                 r2 = 1.26_wp*fi*alf/(1.0_wp + 3.5_wp*fi)
                 ratio = (r1+r2)/(1.0_wp + 0.3_wp*alf)
                 xt = xt + ratio*(xt - x(i-2))
             end select
           
-            call lgroot(xt,nn,alf,dpn,pn1,b,c,eps)
+            call lgroot(xt,nn,alf,dpn,pn1,b,c,eps_)
             x(i) = xt
             a(i) = cc/dpn/pn1
             write(*,'(f6.2,2i3,2(1x,e14.8),2x,2(1x,e14.8))') alf,nn,i,xt,a(i)
@@ -314,36 +250,37 @@ contains
 
     end subroutine
 
-
-    !                  IMPROVES THE APPROXIMATE ROOT  C
-    !                IN ADDITION WE ALSO OBTAIN
+!>
+!   Improves the approximate root `x` of the Laguerre polynomial
+!
+!   In addition we also obtain the derivative of $L(n)$ at $x$
+!   and the value of $L(n-1)$ at x
+!
     pure subroutine lgroot(x,nn,alf,dpn,pn1,b,c,eps)
-        real(wp), intent(inout) :: x
-        integer, intent(in) :: nn
-        real(wp), intent(in) :: alf
-        real(wp), intent(out) :: dpn !! DERIVATIVE OF P(N) AT X
-        real(wp), intent(out) :: pn1 !! VALUE OF P(N-1) AT X
-        real(wp), intent(in) :: b(*)
-        real(wp), intent(in) :: c(*)
-        real(wp), intent(in) :: eps
+        real(wp), intent(inout) :: x        !! Approximate root value
+        integer, intent(in) :: nn           !! Degree of polynomial
+        real(wp), intent(in) :: alf         !! Exponent $\alfa$ of the Laguerre polynomial
+        real(wp), intent(out) :: dpn        !! Derivative of L(n) at x
+        real(wp), intent(out) :: pn1        !! Value of L(n-1) at x
+        real(wp), intent(in) :: b(*), c(*)  !! Coefficients of the recurrence relation
+        real(wp), intent(in) :: eps         !! Desired accuracy
 
         integer :: iter
         real(wp) :: d, p, dp
 
-        iter = 0
-        do
-            iter = iter + 1
+        do iter = 1, max_iter
             call lgrecur(p,dp,pn1,x,nn,alf,b,c)
             d = p/dp
             x = x - d
             if (abs(d/x) < eps) exit
-            if (iter > max_iter) exit
         end do
         dpn = dp
 
     end subroutine lgroot
 
-
+!>
+!   Recurrence relation of the Laguerre polynomial
+!
     pure subroutine lgrecur(pn,dpn,pn1,x,nn,alf,b,c)
         real(wp), intent(out) :: pn
         real(wp), intent(out) :: dpn
@@ -375,19 +312,34 @@ contains
     end subroutine
 
 
-    !                  CALCULATES THE ZEROS  X(I)  OF THE NN-TH ORDER
-    !                HERMITE POLYNOMIAL.  THE LARGEST ZERO WILL BE
-    !                STORED IN X(1).  ALSO CALCULATES THE CORRESPONDING
-    !                COEFFICIENTS  A(I)  OF THE NN-TH ORDER GAUSS-HERMITE
-    !                QUADRATURE FORMULA OF DEGREE 2*NN-1.
+!>
+!   Calculates the zeros x(i) of the nn-th order Hermite polynomial
+!
+!   The largest zero will be stored in `x(1)`. Also calculates the 
+!   corresponding coefficients `a(i)` of the nn-th order Gauss-Hermite 
+!   quadrature formula of degree `2*nn-1`.
+!
+!   The initial estimate for the largest zero is one given by 
+!   Szegö (1959, p. 131):
+!
+!   \[x_n \simeq x_n^* = (2n+1)^{1/2} - 1.85575(2n+1)^{-1/6}\]
+!
+!### References
+! * Szegö, G., *Orthogonal Polynomials*, Am. Math. Soc. Colloquim Publ., **23** 
+!   (1959)
+!
     subroutine hermite(nn,x,a,eps)
-        integer, intent(in) :: nn
-        real(wp), intent(out) :: x(nn)
-        real(wp), intent(out) :: a(nn)
-        real(wp), intent(in) :: eps
+        integer, intent(in) :: nn           !! Number of points
+        real(wp), intent(out) :: x(nn)      !! Zeros of the Hermite polynomial
+        real(wp), intent(out) :: a(nn)      !! Weights of the quadrature formula
+        real(wp), intent(in), optional :: eps         !! Desired accuracy
 
         real(wp) :: fn, cc, s, xt, dpn, pn1
         integer :: n1, n2, i, ni
+        real(wp) :: eps_
+
+        eps_ = epsm
+        if (present(eps)) eps_ = eps
 
         fn = real(nn,wp)
         n1 = nn - 1
@@ -397,7 +349,7 @@ contains
         do i = 1, n2
             select case(i)
             case(1)
-                xt = s**3 - 1.85575_wp/5.0_wp       ! largest zero
+                xt = s**3 - 1.85575_wp/(5.0_wp)!**(1._wp/6._wp)       ! largest zero
             case(2)
                 xt = xt - 1.14_wp*fn**0.426_wp/xt  ! second zero
             case(3)
@@ -408,7 +360,7 @@ contains
                 xt = 2.0_wp*xt - x(i-2)         ! all other zeros
             end select
               
-            call hroot(xt,nn,dpn,pn1,eps)
+            call hroot(xt,nn,dpn,pn1,eps_)
             x(i) = xt
             a(i) = cc/dpn/pn1
             write(*,'(2i4,2(2x,e14.8))') nn,i,xt,a(i)
@@ -419,33 +371,35 @@ contains
     end subroutine hermite
 
 
-    !>                  IMPROVES THE APPROXIMATE ROOT  X
-    !                IN ADDITION WE ALSO OBTAIN
-    !                    DPN = DERIVATIVE OF H(N) AT X
-    !                    PN1 = VALUE OF H(N-1) AT X
-    pure subroutine hroot(x,nn,dpn,pn1,eps)
-        real(wp), intent(inout) :: x       !! the approximate root x
-        integer, intent(in) :: nn
-        real(wp), intent(out) :: dpn       !! derivative of H(N) at x
-        real(wp), intent(out) :: pn1       !! value of H(n-1) at x
-        real(wp), intent(in) :: eps
+!>
+!   Improves the approximate root `x` of the Hermite polynomial
+!
+!   In addition we also obtain the derivative of $H(n)$ at $x$
+!   and the value of $H(n-1)$ at x
+!
+    subroutine hroot(x,nn,dpn,pn1,eps)
+        real(wp), intent(inout) :: x        !! Approximate root value
+        integer, intent(in) :: nn           !! Degree of polynomial
+        real(wp), intent(out) :: dpn        !! Derivative of H(n) at x
+        real(wp), intent(out) :: pn1        !! Value of H(n-1) at x
+        real(wp), intent(in) :: eps         !! Desired accuracy
 
         integer :: iter
         real(wp) :: p, dp, d
 
-        iter = 0
-        do
-            iter = iter + 1
+        do iter = 1, max_iter
             call hrecur(p,dp,pn1,x,nn)
             d = p/dp
             x = x - d
             if (abs(d) < eps) exit
-            if (iter > max_iter) exit
         end do
+        print *, "iter = ", iter
         dpn = dp
     end subroutine
 
-
+!>
+!   Recurrence relation of the Hermite polynomial
+!
     pure subroutine hrecur(pn,dpn,pn1,x,nn)
         real(wp), intent(out) :: pn, dpn, pn1
         real(wp), intent(in) :: x
@@ -476,20 +430,24 @@ contains
 end module
 
 program test_stroud
-    use, intrinsic :: iso_fortran_env, only: wp => real64
-    use quad_mod, only: hermite, laguerre, pi
+    ! use, intrinsic :: iso_fortran_env, only: wp => real64
+    use quad_mod, only: jacobi, hermite, laguerre, pi, wp
     implicit none
 
     real(wp), parameter :: eps = epsilon(1.0_wp)
-    integer, parameter :: n = 2
+    integer, parameter :: n = 10
     real(wp) :: x(n), a(n), aa(n)
     real(wp) :: b(n), c(n)
-    real(wp) :: alf, bta,csx,csa,tsx,tsa
+    real(wp) :: alf,bta,csx,csa,tsx,tsa
     integer :: i
 
+    alf = 0.0_wp
+    bta = 0.0_wp
+    call legendre(n,alf,bta,b,c)
+    print *, "Jacobi quadrature"
+    call jacobi(n,x,a,alf,bta,b,c,eps,csx,csa,tsx,tsa)
 
     call hermite(n,x,a,eps)
-
     call get_hermite(n,aa)
     print *, "Hermite quadrature"
     do i = 1, n
@@ -497,13 +455,22 @@ program test_stroud
     end do
 
     print *, "Generalized Laguerre-Gauss Quadrature"
-
     alf = 0.0_wp
-    b = [(alf + 2*i - 1,i=1,n)]
-    c = [((i-1)*(alf+i-1),i=1,n)]
+    call get_laguerre_recur(n,alf,b,c)
     call laguerre(n,x,a,alf,b,c,eps,csx,csa,tsx,tsa)
 
 contains
+
+    subroutine get_laguerre_recur(nn,alf,b,c)
+        integer, intent(in) :: nn
+        real(wp), intent(in) :: alf
+        real(wp), intent(out) :: b(nn), c(nn)
+        integer :: i
+        do i = 1, nn
+            b(i) = alf + 2*i - 1
+            c(i) = (i-1)*(alf+i-1)
+        end do
+    end subroutine
 
     subroutine get_hermite(nn,a)
         integer, intent(in) :: nn
@@ -526,4 +493,27 @@ contains
             return
         end select
     end subroutine
+
+    subroutine legendre(nn,alf,bta,b,c)
+        integer, intent(in) :: nn
+        real(wp), intent(in) :: alf, bta
+        real(wp), intent(out) :: b(nn), c(nn)
+        integer :: n
+        real(wp) :: num, denom
+
+        do n = 1, nn
+            b(n) = (alf + bta)*(bta - alf)/(2*n + alf + bta)/(2*n + alf + bta - 2)
+        
+            if (n == 2) then
+                num = 4.*(alf + 1)*(bta + 1)
+                denom = (alf + bta + 3)*(alf + bta + 2)**2
+                c(n) = num/denom
+            else
+                num = 4.*(n-1)*(n+alf-1)*(n+bta-1)*(n+alf+bta-1)
+                denom = (2*n+alf+bta-1)*(2*n + alf +bta - 2)**2*(2*n + alf + bta - 3)
+                c(n) = num/denom
+            end if
+        end do
+    end subroutine
+
 end program
