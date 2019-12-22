@@ -4,11 +4,12 @@
 #----------------------------------------------------------------------
 
 FC = gfortran
-FFLAGS = -Wall
+FFLAGS = -Wall -fbacktrace -std=legacy
 FLFLAGS =
 
-PROGRAMS = quad_driver
-OBJECTS = quad_mod.o
+PROGRAMS = legacy_quad_driver
+OBJECTS = 	flgama.o hermit.o hrecur.o hroot.o jacobi.o laguer.o \
+			lgrecr.o lgroot.o recur.o root.o
 
 #--------------------------------------------------------------
 # This is the default target.
@@ -21,7 +22,7 @@ all : $(PROGRAMS)
 # This section shows how to link each example program.
 #-------------------------------------------------------------
 
-quad_driver: quad_driver.o quad_mod.o
+legacy_quad_driver: legacy_quad_driver.o $(OBJECTS)
 	$(FC) $(FFLAGS) -o $@ $(FLFLAGS) $^
 
 #-------------------------------------------------------------
@@ -34,7 +35,12 @@ quad_driver: quad_driver.o quad_mod.o
 %.o: %.f90
 	$(FC) $(FFLAGS) -c $<
 
-quad_driver.o: quad_mod.o
+hermit.o: flgama.o hroot.o
+hroot.o: hrecur.o
+jacobi.o: flgama.o root.o
+root.o: recur.o
+laguer.o: lgroot.o
+lgroot.o: lgrecr.o
 
 #----------------------------------------------
 # This section shows how to clean up afterward.

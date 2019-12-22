@@ -40,4 +40,4 @@ C
    10 A(NI) = A(I)
    20 FORMAT(2I4,2(2X,E14.8))
       RETURN
-      END   
+      END
