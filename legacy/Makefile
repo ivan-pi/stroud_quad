@@ -8,8 +8,8 @@ FFLAGS = -Wall -fbacktrace -std=legacy
 FLFLAGS =
 
 PROGRAMS = legacy_quad_driver
-OBJECTS = 	flgama.o hermit.o hrecur.o hroot.o jacobi.o laguer.o \
-			lgrecr.o lgroot.o recur.o root.o
+OBJECTS = 	flgama.o gamma.o hermit.o hrecur.o hroot.o laguer.o \
+			lgrecr.o lgroot.o jacobi.o recur.o root.o
 
 #--------------------------------------------------------------
 # This is the default target.
@@ -35,12 +35,12 @@ legacy_quad_driver: legacy_quad_driver.o $(OBJECTS)
 %.o: %.f90
 	$(FC) $(FFLAGS) -c $<
 
-hermit.o: flgama.o hroot.o
-hroot.o: hrecur.o
 jacobi.o: flgama.o root.o
 root.o: recur.o
-laguer.o: lgroot.o
+laguer.o: gamma.o lgroot.o
 lgroot.o: lgrecr.o
+hermit.o: gamma.o flgama.o hroot.o
+hroot.o: hrecur.o
 
 #----------------------------------------------
 # This section shows how to clean up afterward.

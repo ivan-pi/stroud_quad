@@ -6,6 +6,7 @@ C                COEFFICIENTS  A(I)  OF THE NN-TH ORDER GAUSS-HERMITE
 C                QUADRATURE FORMULA OF DEGREE 2*NN-1.
 C
       DIMENSION X(50),A(50)
+      EXTERNAL GAMMA
       FN = NN
       N1 = NN - 1
       N2 = (NN+1)/2
