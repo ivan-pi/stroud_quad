@@ -21,6 +21,7 @@ C                    CSX = CALC SUM X(I)    TSX = TRUE SUM X(I)
 C                    CSA = CALC SUM A(I)    TSA = TRUE SUM A(I)
 C
       DIMENSION X(50),A(50), B(50),C(50)
+      EXTERNAL GAMMA
       FN = NN
       CSX = 0.
       CSA = 0.
