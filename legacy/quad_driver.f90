@@ -43,7 +43,7 @@ contains
 
         do n = 1, nn
             b(n) = (alf + bta)*(bta - alf)/(2*n + alf + bta)/(2*n + alf + bta - 2)
-        
+
             if (n == 2) then
                 c(n) = 4.*(alf + 1)*(bta + 1)/(alf + bta + 3)/(alf + bta + 2)**2
             else
@@ -81,7 +81,7 @@ program main
 
 
     print *, "Chebyshev first kind quadrature"
-    
+
     alf = -0.5
     bta = -0.5
     b = 0
@@ -92,7 +92,7 @@ program main
 
 
     print *, "Chebyshev second kind quadrature"
-    
+
     alf = -0.5
     bta = -0.5
     b = 0
@@ -102,7 +102,8 @@ program main
 
 
     print *, "Generalized Laguerre-Gauss Quadrature"
-
+    alf = 0.5
+    bta = 0.5
     alf = 0.0
     b = [(alf + 2*i - 1,i=1,n)]
     c = [((i-1)*(alf+i-1),i=1,n)]
