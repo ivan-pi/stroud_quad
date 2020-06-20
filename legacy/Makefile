@@ -37,10 +37,10 @@ legacy_quad_driver: legacy_quad_driver.o $(OBJECTS)
 
 jacobi.o: flgama.o root.o
 root.o: recur.o
-laguer.o: gamma.o lgroot.o
-lgroot.o: lgrecr.o
 hermit.o: gamma.o flgama.o hroot.o
 hroot.o: hrecur.o
+laguer.o: gamma.o lgroot.o
+lgroot.o: lgrecr.o
 
 #----------------------------------------------
 # This section shows how to clean up afterward.
