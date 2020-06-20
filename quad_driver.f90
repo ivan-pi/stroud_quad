@@ -8,7 +8,7 @@ program test_quad_mod
 
     real(wp), parameter :: eps = epsilon(1.0_wp)
     real(wp) :: x(n), a(n), b(n), c(n)
-    real(wp) :: alf,bta,csx,csa,tsx,tsa
+    real(wp) :: alf, bta, csx, csa, tsx, tsa
 
     write(*,*) "Gauss-Legendre Quadrature"
     alf = 0.0_wp
@@ -28,22 +28,40 @@ program test_quad_mod
 
     write(*,*)
     write(*,*) "Gauss-Chebyshev Quadrature (first kind)"
-    alf = -0.5_wp
-    bta = -0.5_wp
-    b = 0.0_wp
-    c(2) = 0.5_wp
-    c(3:) = 0.25_wp
+    call r_chebyshev1(n,alf,bta,b,c)
     call jacobi(n,x,a,alf,bta,b,c,eps,csx,csa,tsx,tsa)
 
     write(*,*)
     write(*,*) "Gauss-Chebyshev Quadrature (second kind)"
-    alf = 0.5_wp
-    bta = 0.5_wp
-    b = 0.0_wp
-    c(2:) = 0.25_wp
+    call r_chebyshev2(n,alf,bta,b,c)
     call jacobi(n,x,a,alf,bta,b,c,eps,csx,csa,tsx,tsa)
 
 contains
+
+    ! Chebyshev polynomial (first kind) recurrence relation
+    subroutine r_chebyshev1(nn,alf,bta,b,c)
+        integer, intent(in) :: nn
+        real(wp), intent(out) :: alf, bta
+        real(wp), intent(out) :: b(nn), c(nn)
+
+        alf = -0.5_wp
+        bta = -0.5_wp
+        b = 0.0_wp
+        c(2) = 0.5_wp
+        c(3:) = 0.25_wp
+    end subroutine
+
+    ! Chebyshev polynomial (second kind) recurrence relation
+    subroutine r_chebyshev2(nn,alf,bta,b,c)
+        integer, intent(in) :: nn
+        real(wp), intent(out) :: alf, bta
+        real(wp), intent(out) :: b(nn), c(nn)
+
+        alf = 0.5_wp
+        bta = 0.5_wp
+        b = 0.0_wp
+        c(2:) = 0.25_wp
+    end subroutine
 
     ! Laguerre polynomial recurrence relation
     subroutine r_laguerre(nn,alf,b,c)
@@ -79,28 +97,5 @@ contains
             end if
         end do
     end subroutine
-
-    ! Second, third, and fourth Hermite quadrature rules
-    ! subroutine get_hermite(nn,a)
-    !     integer, intent(in) :: nn
-    !     real(wp), intent(out) :: a(nn)
-
-    !     select case(nn)
-    !     case(2)
-    !         a(1) = 0.5_wp*sqrt(pi)
-    !         a(2) = a(1)
-    !     case(3)
-    !         a(1) = sqrt(pi)/6.0_wp
-    !         a(2) = 2.0_wp*sqrt(pi)/3.0_wp
-    !         a(3) = a(1)
-    !     case(4)
-    !         a(1) = sqrt(pi)/(4.0_wp*(3.0_wp + sqrt(6.0_wp)))
-    !         a(2) = sqrt(pi)/(4.0_wp*(3.0_wp - sqrt(6.0_wp)))
-    !         a(3) = a(2)
-    !         a(4) = a(1)
-    !     case default
-    !         return
-    !     end select
-    ! end subroutine
 
 end program
