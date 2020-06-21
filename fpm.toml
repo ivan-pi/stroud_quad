@@ -1,0 +1,13 @@
+name = "stroud_quad"
+version = "1.0"
+author = "Stroud & Secrest"
+license = "unknown"
+maintaner = "ivan.pribec@gmail.com"
+
+[library]
+source-dir = "src"
+
+[[test]]
+name = "quad_driver"
+source-dir = "tests"
+main = "quad_driver.f90"
